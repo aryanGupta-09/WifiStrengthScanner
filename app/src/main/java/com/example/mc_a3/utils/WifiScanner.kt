@@ -55,8 +55,8 @@ class WifiScanner(private val context: Context) {
                     .map { it.level }
             }
             results.isEmpty() -> {
-                // No networks found, return matrix with minimum signal levels
-                List(LocationData.MATRIX_SIZE) { -100 }
+                // No networks found, return an empty list
+                emptyList()
             }
             else -> {
                 // Too few networks, repeat the pattern until we reach 100
