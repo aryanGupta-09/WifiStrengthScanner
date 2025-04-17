@@ -3,11 +3,13 @@ package com.example.mc_a3
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -233,6 +235,9 @@ fun WifiSignalApp(
                 )
                 
                 // Display each location in a separate card
+                // Keep track of which card is expanded
+                var expandedCardIndex by remember { mutableStateOf<Int?>(null) }
+                
                 locationData.values.forEachIndexed { index, data ->
                     // Use a lighter surface color for better visibility in dark mode
                     val cardBackgroundColor = if (isSystemInDarkTheme()) {
@@ -246,7 +251,21 @@ fun WifiSignalApp(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 16.dp),
+                            .padding(bottom = 16.dp)
+                            .clickable {
+                                // Toggle expanded state when card is clicked
+                                if (expandedCardIndex == index) {
+                                    expandedCardIndex = null // collapse if already expanded
+                                } else {
+                                    expandedCardIndex = index // expand this card
+                                    
+                                    // Log the matrix to Logcat
+                                    val logTag = "WifiMatrix"
+                                    Log.d(logTag, "Matrix for ${data.name}:")
+                                    val matrixString = formatMatrixForLog(data.signalMatrix)
+                                    Log.d(logTag, matrixString)
+                                }
+                            },
                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                         colors = CardDefaults.cardColors(containerColor = cardBackgroundColor)
                     ) {
@@ -260,6 +279,29 @@ fun WifiSignalApp(
                                 barColor = getColorForLocation(data),
                                 modifier = Modifier.fillMaxWidth()
                             )
+                            
+                            // Show matrix data when expanded
+                            if (expandedCardIndex == index) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                
+                                Text(
+                                    text = "Signal Matrix (100 elements):",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                
+                                // Display the matrix data in a scrollable column
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = formatMatrixForDisplay(data.signalMatrix),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -339,4 +381,54 @@ private fun calculateStatsBetweenLocations(locations: List<LocationData>): Locat
         averageDifference = diffs.average().toInt(),
         maxDifference = diffs.maxOrNull() ?: 0
     )
+}
+
+/**
+ * Formats the signal matrix for display in the UI
+ * Creates a multi-line string with 10 values per line
+ */
+private fun formatMatrixForDisplay(matrix: List<Int>): String {
+    if (matrix.isEmpty()) return "No signal data available"
+    
+    val builder = StringBuilder()
+    matrix.forEachIndexed { index, value ->
+        builder.append("$value dBm")
+        // Add comma except for last element or end of row
+        if (index < matrix.size - 1) {
+            builder.append(", ")
+        }
+        // Create a new line after every 10 elements
+        if ((index + 1) % 10 == 0) {
+            builder.append("\n")
+        }
+    }
+    return builder.toString()
+}
+
+/**
+ * Formats the signal matrix for logging to Logcat
+ * Creates a compact representation for easier reading in logs
+ */
+private fun formatMatrixForLog(matrix: List<Int>): String {
+    if (matrix.isEmpty()) return "Empty matrix"
+    
+    val builder = StringBuilder()
+    builder.append("[\n")
+    matrix.forEachIndexed { index, value ->
+        // Add a tab for each row
+        if (index % 10 == 0) {
+            builder.append("\t")
+        }
+        builder.append("$value")
+        // Add separator except for last element
+        if (index < matrix.size - 1) {
+            builder.append(", ")
+        }
+        // Create a new line after every 10 elements
+        if ((index + 1) % 10 == 0) {
+            builder.append("\n")
+        }
+    }
+    builder.append("\n]")
+    return builder.toString()
 }
