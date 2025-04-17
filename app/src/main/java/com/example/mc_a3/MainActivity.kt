@@ -257,7 +257,7 @@ fun WifiSignalApp(
                         ) {
                             SignalMatrixVisualization(
                                 locationData = data,
-                                barColor = getColorForLocation(index),
+                                barColor = getColorForLocation(data),
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -298,11 +298,16 @@ fun WifiSignalApp(
     }
 }
 
-private fun getColorForLocation(index: Int): Color {
-    return when (index % 3) {
-        0 -> Color(0xFF1976D2) // Blue
-        1 -> Color(0xFFF44336) // Red
-        else -> Color(0xFF4CAF50) // Green
+private fun getColorForLocation(locationData: LocationData): Color {
+    // Extract the location number from the location name
+    val locationName = locationData.name
+    val locationNumber = locationName.split(" ").lastOrNull()?.toIntOrNull()
+    
+    return when (locationNumber) {
+        1 -> Color(0xFF1976D2) // Blue for Location 1
+        2 -> Color(0xFFF44336) // Red for Location 2
+        3 -> Color(0xFF4CAF50) // Green for Location 3
+        else -> Color(0xFF9C27B0) // Purple for any other location
     }
 }
 
