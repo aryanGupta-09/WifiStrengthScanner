@@ -139,7 +139,7 @@ fun WifiSignalApp(
                 }
             }
             
-            // Scan and Capture buttons
+            // Single button for scanning and capturing
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -147,24 +147,13 @@ fun WifiSignalApp(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
-                    onClick = { viewModel.startScan() },
-                    enabled = !isScanning && currentLocationName != null,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(if (isScanning) "Scanning..." else "Scan WiFi")
-                }
-                
-                Button(
                     onClick = {
-                        viewModel.captureLocationData()
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Data captured for $currentLocationName")
-                        }
+                        viewModel.scanAndCaptureData()
                     },
                     enabled = !isScanning && currentLocationName != null,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Capture Data")
+                    Text(if (isScanning) "Processing..." else "Record WiFi Fingerprint")
                 }
             }
             
