@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -227,18 +228,40 @@ fun WifiSignalApp(
             } else {
                 Text(
                     text = "Comparison of WiFi Signal Strengths Across Locations",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.headlineMedium,  // Upgraded from headlineSmall to headlineMedium
                     modifier = Modifier.padding(vertical = 16.dp)
                 )
                 
+                // Display each location in a separate card
                 locationData.values.forEachIndexed { index, data ->
-                    SignalMatrixVisualization(
-                        locationData = data,
-                        barColor = getColorForLocation(index),
+                    // Use a lighter surface color for better visibility in dark mode
+                    val cardBackgroundColor = if (isSystemInDarkTheme()) {
+                        // Use a lighter gray in dark mode for better contrast
+                        Color(0xFF2C2C2C)
+                    } else {
+                        // In light mode, use the default surface color (white)
+                        MaterialTheme.colorScheme.surface
+                    }
+                    
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 16.dp)
-                    )
+                            .padding(bottom = 16.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = cardBackgroundColor)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .fillMaxWidth()
+                        ) {
+                            SignalMatrixVisualization(
+                                locationData = data,
+                                barColor = getColorForLocation(index),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
                 }
                 
                 if (locationData.size >= 2) {
@@ -247,21 +270,28 @@ fun WifiSignalApp(
                     
                     Text(
                         text = "Cross-Location Statistics",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.headlineMedium,
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
                     
-                    Text(
-                        text = "Average difference between locations: ${stats.averageDifference} dBm",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                    
-                    Text(
-                        text = "Max difference between locations: ${stats.maxDifference} dBm",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
+                    // Display cross-location stats directly without a card
+                    Column(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Average difference between locations: ${stats.averageDifference} dBm",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        
+                        Text(
+                            text = "Max difference between locations: ${stats.maxDifference} dBm",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
                 }
             }
         }
