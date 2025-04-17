@@ -55,4 +55,14 @@ class LocationRepository(private val context: Context) {
             }
         }
     }
+    
+    // Clear all location data
+    suspend fun clearAllLocationData() {
+        context.dataStore.edit { preferences ->
+            predefinedLocations.forEach { locationName ->
+                val key = stringPreferencesKey(locationName)
+                preferences.remove(key)
+            }
+        }
+    }
 }

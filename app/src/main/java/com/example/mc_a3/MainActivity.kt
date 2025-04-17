@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -143,7 +144,7 @@ fun WifiSignalApp(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
@@ -155,6 +156,59 @@ fun WifiSignalApp(
                 ) {
                     Text(if (isScanning) "Processing..." else "Record WiFi Fingerprint")
                 }
+            }
+            
+            // Clear button with Compose dialog
+            var showClearConfirmDialog by remember { mutableStateOf(false) }
+            
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { showClearConfirmDialog = true },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    ),
+                    enabled = locationData.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Clear All Data")
+                }
+            }
+            
+            // Confirmation dialog
+            if (showClearConfirmDialog) {
+                AlertDialog(
+                    onDismissRequest = { showClearConfirmDialog = false },
+                    title = { Text("Clear All Data") },
+                    text = { 
+                        Text("Are you sure you want to clear all the location data?") 
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                viewModel.clearAllLocationData()
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("All the location data has been cleared")
+                                }
+                                showClearConfirmDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Text("Clear")
+                        }
+                    },
+                    dismissButton = {
+                        OutlinedButton(onClick = { showClearConfirmDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
             }
             
             // Location Data Visualizations

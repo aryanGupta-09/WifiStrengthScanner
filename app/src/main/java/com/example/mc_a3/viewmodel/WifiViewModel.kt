@@ -103,6 +103,14 @@ class WifiViewModel(application: Application) : AndroidViewModel(application) {
     
     fun getPredefinedLocations(): List<String> = locationRepository.predefinedLocations
     
+    fun clearAllLocationData() {
+        viewModelScope.launch {
+            locationRepository.clearAllLocationData()
+            // Clear the local data as well
+            _locationData.value = emptyMap()
+        }
+    }
+    
     override fun onCleared() {
         super.onCleared()
         wifiScanner.cleanup()
