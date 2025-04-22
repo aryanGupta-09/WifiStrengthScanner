@@ -45,25 +45,79 @@ class WifiScanner(private val context: Context) {
     fun createSignalMatrix(): List<Int> {
         val results = _scanResults.value
         
-        // If we have too few or too many networks, we need to normalize to size 100
+        if (results.isEmpty()) {
+            // No networks found, return an empty list
+            return emptyList()
+        }
+        
+        // Sort access points by signal strength (strongest first)
+        val sortedResults = results.sortedByDescending { it.level }
+        
+        // Create a statistically expanded matrix
         return when {
-            results.size >= LocationData.MATRIX_SIZE -> {
-                // Too many networks, take the strongest ones
-                results
-                    .sortedByDescending { it.level }
-                    .take(LocationData.MATRIX_SIZE)
-                    .map { it.level }
+            // If we have exactly 100 networks, use them directly (unlikely)
+            sortedResults.size == LocationData.MATRIX_SIZE -> {
+                sortedResults.map { it.level }
             }
-            results.isEmpty() -> {
-                // No networks found, return an empty list
-                emptyList()
+            
+            // If we have more than 100 networks, take the strongest 100
+            sortedResults.size > LocationData.MATRIX_SIZE -> {
+                sortedResults.take(LocationData.MATRIX_SIZE).map { it.level }
             }
+            
+            // If we have fewer than 100 networks, apply statistical expansion
             else -> {
-                // Too few networks, repeat the pattern until we reach 100
-                val networkLevels = results.map { it.level }
-                List(LocationData.MATRIX_SIZE) { index -> networkLevels[index % networkLevels.size] }
+                // 1. Use actual readings first
+                val baseMatrix = sortedResults.map { it.level }.toMutableList()
+                
+                // 2. Calculate statistics from real readings
+                val minSignal = baseMatrix.minOrNull() ?: -100
+                val maxSignal = baseMatrix.maxOrNull() ?: -40
+                val avgSignal = baseMatrix.average().toInt()
+                val stdDev = calculateStandardDeviation(baseMatrix, avgSignal)
+                
+                // 3. Create a larger matrix with statistical variation
+                val expandedMatrix = mutableListOf<Int>()
+                expandedMatrix.addAll(baseMatrix) // Start with real data
+                
+                // Calculate how many additional readings we need
+                val additionalReadingsNeeded = LocationData.MATRIX_SIZE - baseMatrix.size
+                
+                // Add variations around existing readings with Gaussian distribution
+                repeat(additionalReadingsNeeded) {
+                    // Pick a random base reading to vary from
+                    val baseReading = baseMatrix[it % baseMatrix.size]
+                    
+                    // Apply Gaussian variation (with controlled deviation)
+                    // Using smaller standard deviation to keep values realistic
+                    val variation = (stdDev * (Math.random() * 2 - 1) * 0.5).toInt()
+                    
+                    // Ensure the variation stays within realistic bounds (-100 to -40 dBm)
+                    val newReading = (baseReading + variation).coerceIn(minSignal - 5, maxSignal + 3)
+                    
+                    expandedMatrix.add(newReading)
+                }
+                
+                // Shuffle the matrix to avoid patterns (but keep first few real readings intact)
+                val firstRealReadings = expandedMatrix.take(baseMatrix.size)
+                val artificialReadings = expandedMatrix.drop(baseMatrix.size).shuffled()
+                
+                // Combine and return
+                firstRealReadings + artificialReadings
             }
         }
+    }
+    
+    // Helper function to calculate standard deviation
+    private fun calculateStandardDeviation(values: List<Int>, mean: Int): Double {
+        if (values.size <= 1) return 2.0 // Default small deviation if we don't have enough data
+        
+        val sumOfSquaredDifferences = values.sumOf { 
+            val difference = it - mean
+            difference * difference 
+        }
+        
+        return Math.sqrt(sumOfSquaredDifferences.toDouble() / (values.size - 1))
     }
 
     // Create a LocationData object from current scan results
