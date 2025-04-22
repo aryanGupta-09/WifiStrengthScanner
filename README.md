@@ -12,8 +12,8 @@ A mobile application for Android that captures, visualizes, and analyzes WiFi si
 
 ## Screenshots
 
-![fingerprint-screenshot](fingerprint-screenshot.jpg)
-![stats-screenshot](stats-screenshot.jpg)
+<img src="fingerprint-screenshot.jpg" alt="fingerprint-screenshot" width="350"/>&nbsp;
+<img src="stats-screenshot.jpg" alt="stats-screenshot" width="350"/>
 
 ## How It Works
 
