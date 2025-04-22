@@ -355,6 +355,13 @@ fun WifiSignalApp(
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                             .fillMaxWidth()
                     ) {
+                        // General statistics section
+                        Text(
+                            text = "General Signal Differences",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
                         Text(
                             text = "Average difference between locations: ${stats.averageDifference} dBm",
                             style = MaterialTheme.typography.bodyMedium,
@@ -364,14 +371,19 @@ fun WifiSignalApp(
                         Text(
                             text = "Max difference between locations: ${stats.maxDifference} dBm",
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(bottom = 16.dp)
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        Divider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant
                         )
                         
                         // Per-access point differences
                         Text(
-                            text = "Access Point Differences Across Locations:",
+                            text = "Per-Access Point Analysis",
                             style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            modifier = Modifier.padding(bottom = 8.dp, top = 8.dp)
                         )
                         
                         if (stats.accessPointStats.isEmpty()) {
@@ -423,9 +435,15 @@ fun WifiSignalApp(
                                         // Show signal difference if present in multiple locations
                                         if (apStat.presentInLocations.size >= 2) {
                                             Text(
-                                                text = "Signal strength difference: ${apStat.signalDifference} dBm",
+                                                text = "Maximum signal difference: ${apStat.signalDifference} dBm",
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 modifier = Modifier.padding(top = 8.dp)
+                                            )
+                                            
+                                            Text(
+                                                text = "Average signal difference: ${apStat.averageSignalDifference} dBm",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
                                             )
                                             
                                             // Show signal strength at each location
@@ -437,11 +455,19 @@ fun WifiSignalApp(
                                                     ) {
                                                         Text(
                                                             text = location,
-                                                            style = MaterialTheme.typography.bodySmall
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = if (location == apStat.bestSignalLocation) 
+                                                                    Color(0xFF4CAF50) // Green for best signal
+                                                                else 
+                                                                    MaterialTheme.colorScheme.onSurface
                                                         )
                                                         Text(
                                                             text = "$level dBm",
-                                                            style = MaterialTheme.typography.bodySmall
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = if (location == apStat.bestSignalLocation) 
+                                                                    Color(0xFF4CAF50) // Green for best signal
+                                                                else 
+                                                                    MaterialTheme.colorScheme.onSurface
                                                         )
                                                     }
                                                 }
@@ -488,7 +514,9 @@ private data class AccessPointStat(
     val ssid: String,
     val presentInLocations: List<String>,
     val signalDifference: Int,
-    val signalLevels: Map<String, Int>
+    val averageSignalDifference: Int,
+    val signalLevels: Map<String, Int>,
+    val bestSignalLocation: String?
 )
 
 private fun calculateStatsBetweenLocations(locations: List<LocationData>): LocationStats {
@@ -496,19 +524,28 @@ private fun calculateStatsBetweenLocations(locations: List<LocationData>): Locat
         return LocationStats(0, 0, emptyList())
     }
     
+    // Calculate average signal strength for each location
+    val locationAverages = locations.map { locationData ->
+        val avgSignal = if (locationData.signalMatrix.isNotEmpty()) {
+            locationData.signalMatrix.average().toInt()
+        } else {
+            0
+        }
+        Pair(locationData.name, avgSignal)
+    }
+    
     val diffs = mutableListOf<Int>()
     
-    // Compare each location with every other location for matrix differences
-    for (i in 0 until locations.size - 1) {
-        for (j in i + 1 until locations.size) {
-            val matrix1 = locations[i].signalMatrix
-            val matrix2 = locations[j].signalMatrix
-            
-            // Calculate element-wise absolute differences
-            val elementDiffs = matrix1.zip(matrix2) { a, b -> Math.abs(a - b) }
-            diffs.addAll(elementDiffs)
+    // Compare average signal strengths between locations
+    for (i in 0 until locationAverages.size - 1) {
+        for (j in i + 1 until locationAverages.size) {
+            val avgDiff = Math.abs(locationAverages[i].second - locationAverages[j].second)
+            diffs.add(avgDiff)
         }
     }
+    
+    val avgDifference = if (diffs.isNotEmpty()) diffs.average().toInt() else 0
+    val maxDifference = diffs.maxOrNull() ?: 0
     
     // Calculate per-access point differences
     val accessPointsByBssid = mutableMapOf<String, MutableMap<String, Int>>()
@@ -542,18 +579,39 @@ private fun calculateStatsBetweenLocations(locations: List<LocationData>): Locat
             0 // If only present in one location, difference is 0
         }
         
+        // Calculate the average signal difference
+        val pairwiseDiffs = mutableListOf<Int>()
+        if (levels.size >= 2) {
+            for (i in 0 until levels.size - 1) {
+                for (j in i + 1 until levels.size) {
+                    pairwiseDiffs.add(Math.abs(levels[i] - levels[j]))
+                }
+            }
+        }
+        
+        val averageSignalDifference = if (pairwiseDiffs.isNotEmpty()) {
+            pairwiseDiffs.average().toInt()
+        } else {
+            0
+        }
+        
+        // Determine the location with the best signal
+        val bestSignalLocation = levelsByLocation.maxByOrNull { it.value }?.key
+        
         AccessPointStat(
             bssid = bssid,
             ssid = accessPointSsids[bssid] ?: "<Unknown>",
             presentInLocations = levelsByLocation.keys.toList(),
             signalDifference = signalDifference,
-            signalLevels = levelsByLocation
+            averageSignalDifference = averageSignalDifference,
+            signalLevels = levelsByLocation,
+            bestSignalLocation = bestSignalLocation
         )
     }.sortedByDescending { it.signalDifference } // Sort by largest difference first
     
     return LocationStats(
-        averageDifference = diffs.average().toInt(),
-        maxDifference = diffs.maxOrNull() ?: 0,
+        averageDifference = avgDifference,
+        maxDifference = maxDifference,
         accessPointStats = accessPointStats
     )
 }
