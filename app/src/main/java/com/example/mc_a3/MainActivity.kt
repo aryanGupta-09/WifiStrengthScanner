@@ -364,8 +364,99 @@ fun WifiSignalApp(
                         Text(
                             text = "Max difference between locations: ${stats.maxDifference} dBm",
                             style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(bottom = 4.dp)
+                            modifier = Modifier.padding(bottom = 16.dp)
                         )
+                        
+                        // Per-access point differences
+                        Text(
+                            text = "Access Point Differences Across Locations:",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        if (stats.accessPointStats.isEmpty()) {
+                            Text(
+                                text = "No common access points found between locations",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        } else {
+                            // Create a card for each access point
+                            stats.accessPointStats.forEach { apStat ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp)
+                                    ) {
+                                        // Show AP name and presence information
+                                        Text(
+                                            text = "${apStat.ssid} (${apStat.bssid})",
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                        
+                                        if (apStat.presentInLocations.size < locationData.size) {
+                                            // Show which locations this AP appears in
+                                            Text(
+                                                text = "Present in: ${apStat.presentInLocations.joinToString(", ")}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                modifier = Modifier.padding(top = 4.dp),
+                                                color = if (apStat.presentInLocations.size == 1) 
+                                                    MaterialTheme.colorScheme.error 
+                                                else 
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "Present in all locations",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                modifier = Modifier.padding(top = 4.dp),
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        
+                                        // Show signal difference if present in multiple locations
+                                        if (apStat.presentInLocations.size >= 2) {
+                                            Text(
+                                                text = "Signal strength difference: ${apStat.signalDifference} dBm",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.padding(top = 8.dp)
+                                            )
+                                            
+                                            // Show signal strength at each location
+                                            Column(modifier = Modifier.padding(top = 4.dp)) {
+                                                apStat.signalLevels.forEach { (location, level) ->
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Text(
+                                                            text = location,
+                                                            style = MaterialTheme.typography.bodySmall
+                                                        )
+                                                        Text(
+                                                            text = "$level dBm",
+                                                            style = MaterialTheme.typography.bodySmall
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            Text(
+                                                text = "Signal strength: ${apStat.signalLevels.values.first()} dBm",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.padding(top = 8.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -388,17 +479,26 @@ private fun getColorForLocation(locationData: LocationData): Color {
 
 private data class LocationStats(
     val averageDifference: Int,
-    val maxDifference: Int
+    val maxDifference: Int,
+    val accessPointStats: List<AccessPointStat>
+)
+
+private data class AccessPointStat(
+    val bssid: String,
+    val ssid: String,
+    val presentInLocations: List<String>,
+    val signalDifference: Int,
+    val signalLevels: Map<String, Int>
 )
 
 private fun calculateStatsBetweenLocations(locations: List<LocationData>): LocationStats {
     if (locations.size < 2) {
-        return LocationStats(0, 0)
+        return LocationStats(0, 0, emptyList())
     }
     
     val diffs = mutableListOf<Int>()
     
-    // Compare each location with every other location
+    // Compare each location with every other location for matrix differences
     for (i in 0 until locations.size - 1) {
         for (j in i + 1 until locations.size) {
             val matrix1 = locations[i].signalMatrix
@@ -410,9 +510,51 @@ private fun calculateStatsBetweenLocations(locations: List<LocationData>): Locat
         }
     }
     
+    // Calculate per-access point differences
+    val accessPointsByBssid = mutableMapOf<String, MutableMap<String, Int>>()
+    val accessPointSsids = mutableMapOf<String, String>()
+    
+    // Group access points by BSSID across all locations
+    locations.forEach { locationData ->
+        val locationName = locationData.name
+        locationData.scanResults.forEach { signal ->
+            // Store the signal level for this location
+            accessPointsByBssid
+                .getOrPut(signal.bssid) { mutableMapOf() }
+                .put(locationName, signal.level)
+            
+            // Store the SSID (we'll use the first non-empty one we find)
+            if (signal.ssid != "<Hidden Network>") {
+                accessPointSsids[signal.bssid] = signal.ssid
+            } else if (!accessPointSsids.containsKey(signal.bssid)) {
+                accessPointSsids[signal.bssid] = signal.ssid
+            }
+        }
+    }
+    
+    // Calculate stats for each access point
+    val accessPointStats = accessPointsByBssid.map { (bssid, levelsByLocation) ->
+        // Calculate the maximum difference in signal strength across locations
+        val levels = levelsByLocation.values.toList()
+        val signalDifference = if (levels.size >= 2) {
+            levels.maxOrNull()!! - levels.minOrNull()!!
+        } else {
+            0 // If only present in one location, difference is 0
+        }
+        
+        AccessPointStat(
+            bssid = bssid,
+            ssid = accessPointSsids[bssid] ?: "<Unknown>",
+            presentInLocations = levelsByLocation.keys.toList(),
+            signalDifference = signalDifference,
+            signalLevels = levelsByLocation
+        )
+    }.sortedByDescending { it.signalDifference } // Sort by largest difference first
+    
     return LocationStats(
         averageDifference = diffs.average().toInt(),
-        maxDifference = diffs.maxOrNull() ?: 0
+        maxDifference = diffs.maxOrNull() ?: 0,
+        accessPointStats = accessPointStats
     )
 }
 
