@@ -280,7 +280,40 @@ fun WifiSignalApp(
                                 modifier = Modifier.fillMaxWidth()
                             )
                             
-                            // Show matrix data when expanded
+                            // Always display WiFi access points detected at this location
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Detected WiFi Access Points:",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            
+                            if (data.scanResults.isEmpty()) {
+                                Text(
+                                    text = "No WiFi networks detected",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            } else {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    data.scanResults.forEachIndexed { apIndex, wifiSignal ->
+                                        Text(
+                                            text = "${apIndex + 1}. ${wifiSignal.ssid} (${wifiSignal.bssid})",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            modifier = Modifier.padding(bottom = 4.dp)
+                                        )
+                                        Text(
+                                            text = "    Signal: ${wifiSignal.level} dBm, Frequency: ${wifiSignal.frequency} MHz",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            // Show matrix data only when expanded
                             if (expandedCardIndex == index) {
                                 Spacer(modifier = Modifier.height(16.dp))
                                 
